@@ -68,9 +68,8 @@
 
    <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">📐 色板教材アプリ</h1>
    <p class="text-center text-gray-600 mb-8">
-       右のパレットから三角形をドラッグして、左のステージで自由に形を作りましょう。
-       三角形をタップ（クリック）すると45度回転します。<br>
-       ステージの外に出した色板は自動で消えます。
+       右のパレットから三角形をドラッグして、左のステージで自由に形を作りましょう。<br>
+       三角形をタップ（クリック）すると45度回転します。ステージの外に出した色板は自動で消えます。
    </p>
 
    <div class="flex flex-col lg:flex-row gap-8 max-w-7xl mx-auto">
@@ -132,7 +131,6 @@
        }
 
        function dragStart(e, element) {
-           element.dataset.isDragging = 'true';
            isMoved = false;
 
            if (element.classList.contains('palette-item')) {
@@ -188,57 +186,11 @@
            const coords = getCoords(e);
            const stageRect = stage.getBoundingClientRect();
 
-           // ステージ左上を原点とした座標に変換（あとは自由に動いてOK）
            let newX = coords.x - stageRect.left - currentX;
            let newY = coords.y - stageRect.top - currentY;
 
            activeTriangle.style.left = `${newX}px`;
            activeTriangle.style.top = `${newY}px`;
-       }
-
-       function dragEnd() {
-           if (!activeTriangle) return;
-
-           activeTriangle.style.zIndex = 'auto';
-
-           const elementToClean = activeTriangle;
-           activeTriangle = null;
-
-           // ▼ ステージ外なら削除（中心座標で判定）
-           if (elementToClean.classList.contains('on-stage')) {
-               const stageRect = stage.getBoundingClientRect();
-               const rect = elementToClean.getBoundingClientRect();
-               const centerX = rect.left + rect.width / 2;
-               const centerY = rect.top + rect.height / 2;
-
-               const outside =
-                   centerX < stageRect.left ||
-                   centerX > stageRect.right ||
-                   centerY < stageRect.top ||
-                   centerY > stageRect.bottom;
-
-               if (outside) {
-                   elementToClean.remove();
-
-                   document.removeEventListener('mousemove', drag);
-                   document.removeEventListener('mouseup', dragEnd);
-                   document.removeEventListener('touchmove', drag);
-                   document.removeEventListener('touchend', dragEnd);
-                   return;
-               }
-           }
-
-           // タップかドラッグかの判定（回転用フラグ）
-           if (!isMoved) {
-               if (elementToClean) {
-                   elementToClean.dataset.isDragging = 'false';
-               }
-           }
-
-           document.removeEventListener('mousemove', drag);
-           document.removeEventListener('mouseup', dragEnd);
-           document.removeEventListener('touchmove', drag);
-           document.removeEventListener('touchend', dragEnd);
        }
 
        // 45度回転（.triangle-shape を回す）
@@ -251,6 +203,49 @@
            if (shape) {
                shape.style.transform = `rotate(${currentRotation}deg)`;
            }
+       }
+
+       function dragEnd() {
+           if (!activeTriangle) return;
+
+           activeTriangle.style.zIndex = 'auto';
+
+           const element = activeTriangle;
+           activeTriangle = null;
+
+           // ▼ ステージ外なら削除（中心座標で判定）
+           if (element.classList.contains('on-stage')) {
+               const stageRect = stage.getBoundingClientRect();
+               const rect = element.getBoundingClientRect();
+               const centerX = rect.left + rect.width / 2;
+               const centerY = rect.top + rect.height / 2;
+
+               const outside =
+                   centerX < stageRect.left ||
+                   centerX > stageRect.right ||
+                   centerY < stageRect.top ||
+                   centerY > stageRect.bottom;
+
+               if (outside) {
+                   element.remove();
+                   removeDragListeners();
+                   return;
+               }
+           }
+
+           // ▼ 動かしていない＝タップとみなして回転（ステージ上のピースのみ）
+           if (!isMoved && element.classList.contains('on-stage')) {
+               rotateTriangle(element);
+           }
+
+           removeDragListeners();
+       }
+
+       function removeDragListeners() {
+           document.removeEventListener('mousemove', drag);
+           document.removeEventListener('mouseup', dragEnd);
+           document.removeEventListener('touchmove', drag);
+           document.removeEventListener('touchend', dragEnd);
        }
 
        // パレットからドラッグ開始
@@ -272,19 +267,6 @@
            const triangle = e.target.closest('.on-stage');
            if (triangle) dragStart(e, triangle);
        }, { passive: false });
-
-       // ステージ上のクリック/タップで回転
-       stage.addEventListener('click', (e) => {
-           const triangle = e.target.closest('.on-stage');
-           if (triangle) {
-               if (triangle.dataset.isDragging === 'false') {
-                   rotateTriangle(triangle);
-                   triangle.dataset.isDragging = 'true';
-               } else {
-                   triangle.dataset.isDragging = 'false';
-               }
-           }
-       });
 
        // ステージクリア
        clearButton.addEventListener('click', () => {
